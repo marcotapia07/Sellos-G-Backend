@@ -1,0 +1,11 @@
+import app from "./app.js";
+import { connectDB } from "./config/db.js"; 
+
+const PORT = process.env.PORT || 3000;
+
+// Conectar a MongoDB
+connectDB();
+
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en el puerto ${PORT}`);
+});
