@@ -1,105 +1,143 @@
-import Admin from "../models/Admin.js";
+import Usuario from "../models/Usuario.js";
+import Producto from "../models/Producto.js";
+import Pedido from "../models/Pedido.js"; // Usamos Pedido como "Venta"
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { Parser } from "json2csv";
 
-// Obtener todos los administradores
-export const getAdmins = async (req, res) => {
-  try {
-    const admins = await Admin.find();
-    res.json(admins);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Crear un nuevo administrador
-export const createAdmin = async (req, res) => {
-  try {
-    const { nombre, apellido, cedula, telefono, correo, password } = req.body;
-
-    // Verificar si el correo ya existe
-    const existeAdmin = await Admin.findOne({ correo });
-    if (existeAdmin) {
-      return res.status(400).json({ message: "El correo ya está registrado" });
-    }
-
-    // Encriptar contraseña
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newAdmin = new Admin({
-      nombre,
-      apellido,
-      cedula,
-      telefono,
-      correo,
-      password: hashedPassword,
-    });
-
-    await newAdmin.save();
-    res.status(201).json({ message: "Administrador creado exitosamente" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Actualizar un administrador
-export const updateAdmin = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Si el body contiene "password", encriptarla antes de guardar
-    if (req.body.password) {
-      req.body.password = await bcrypt.hash(req.body.password, 10);
-    }
-
-    const updatedAdmin = await Admin.findByIdAndUpdate(id, req.body, { new: true });
-    res.json(updatedAdmin);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Eliminar un administrador
-export const deleteAdmin = async (req, res) => {
-  try {
-    const { id } = req.params;
-    await Admin.findByIdAndDelete(id);
-    res.json({ message: "Administrador eliminado" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Login de administrador
+// --------------------------
+// LOGIN ADMIN
+// --------------------------
 export const loginAdmin = async (req, res) => {
+  const { correo, password } = req.body;
+
+  const admin = await Usuario.findOne({ correo });
+  if (!admin) return res.status(404).json({ msg: "Administrador no encontrado" });
+  if (admin.rol !== "administrador") return res.status(403).json({ msg: "Acceso no autorizado" });
+
+  const passwordValida = await bcrypt.compare(password, admin.password);
+  if (!passwordValida) return res.status(401).json({ msg: "Contraseña incorrecta" });
+
+  const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, { expiresIn: "2h" });
+  res.json({ msg: "Login exitoso", token });
+};
+
+// --------------------------
+// CRUD ADMINISTRADORES
+// --------------------------
+export const getAdmins = async (req, res) => {
+  const admins = await Usuario.find({ rol: "administrador" }).select("-password");
+  res.json(admins);
+};
+
+export const createAdmin = async (req, res) => {
+  const { nombre, correo, password } = req.body;
+
+  const existe = await Usuario.findOne({ correo });
+  if (existe) return res.status(400).json({ msg: "El correo ya está registrado" });
+
+  const nuevoAdmin = new Usuario({ nombre, correo, password, rol: "administrador" });
+  await nuevoAdmin.save();
+
+  res.status(201).json({ msg: "Administrador creado", nuevoAdmin });
+};
+
+export const updateAdmin = async (req, res) => {
+  const { id } = req.params;
+  const { nombre, correo } = req.body;
+
+  const actualizado = await Usuario.findByIdAndUpdate(id, { nombre, correo }, { new: true });
+  if (!actualizado) return res.status(404).json({ msg: "Administrador no encontrado" });
+
+  res.json({ msg: "Administrador actualizado", actualizado });
+};
+
+export const deleteAdmin = async (req, res) => {
+  const { id } = req.params;
+  const eliminado = await Usuario.findByIdAndDelete(id);
+  if (!eliminado) return res.status(404).json({ msg: "Administrador no encontrado" });
+  res.json({ msg: "Administrador eliminado correctamente" });
+};
+
+// --------------------------
+// GESTIÓN DE USUARIOS
+// --------------------------
+export const listarUsuarios = async (req, res) => {
+  const usuarios = await Usuario.find({ rol: "empleado" }).select("-password");
+  res.json(usuarios);
+};
+
+export const actualizarUsuario = async (req, res) => {
+  const { id } = req.params;
+  const { nombre, correo, rol } = req.body;
+
+  const usuarioActualizado = await Usuario.findByIdAndUpdate(id, { nombre, correo, rol }, { new: true });
+  if (!usuarioActualizado) return res.status(404).json({ msg: "Usuario no encontrado" });
+
+  res.json({ msg: "Usuario actualizado", usuarioActualizado });
+};
+
+export const eliminarUsuario = async (req, res) => {
+  const { id } = req.params;
+  const eliminado = await Usuario.findByIdAndDelete(id);
+  if (!eliminado) return res.status(404).json({ msg: "Usuario no encontrado" });
+  res.json({ msg: "Usuario eliminado correctamente" });
+};
+
+// --------------------------
+// REPORTES
+// --------------------------
+export const generarReporteVentas = async (req, res) => {
   try {
-    const { correo, password } = req.body;
+    // Obtenemos todos los pedidos (ventas)
+    const pedidos = await Pedido.find()
+      .populate("cliente", "nombre correo")
+      .populate("productos.producto", "nombre precio");
 
-    // Buscar al admin
-    const admin = await Admin.findOne({ correo });
-    if (!admin) {
-      return res.status(404).json({ message: "Administrador no encontrado" });
-    }
+    if (!pedidos.length) return res.json({ msg: "No hay ventas registradas" });
 
-    // Comparar contraseñas
-    const isMatch = await bcrypt.compare(password, admin.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Contraseña incorrecta" });
-    }
-
-    // Generar token JWT
-    const token = jwt.sign({ id: admin._id, rol: "admin" }, process.env.JWT_SECRET, { expiresIn: "1d" });
+    // Calcular totales
+    const totalVentas = pedidos.reduce((sum, p) => sum + (p.total || 0), 0);
+    const cantidadPedidos = pedidos.length;
 
     res.json({
-      message: "Inicio de sesión exitoso",
-      token,
-      admin: {
-        id: admin._id,
-        nombre: admin.nombre,
-        correo: admin.correo
-      }
+      totalVentas,
+      cantidadPedidos,
+      pedidos,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ msg: error.message });
+  }
+};
+
+export const generarReporteUsuarios = async (req, res) => {
+  try {
+    const usuarios = await Usuario.find().select("nombre correo rol");
+    const totalAdmins = usuarios.filter(u => u.rol === "administrador").length;
+    const totalEmpleados = usuarios.filter(u => u.rol === "empleado").length;
+
+    res.json({
+      totalUsuarios: usuarios.length,
+      totalAdmins,
+      totalEmpleados,
+      usuarios,
+    });
+  } catch (error) {
+    res.status(500).json({ msg: error.message });
+  }
+};
+
+// Exportar reporte de usuarios a CSV
+export const exportarReporteCSV = async (req, res) => {
+  try {
+    const usuarios = await Usuario.find().select("nombre correo rol");
+    const parser = new Parser({ fields: ["nombre", "correo", "rol"] });
+    const csv = parser.parse(usuarios);
+
+    res.header("Content-Type", "text/csv");
+    res.attachment("reporte_usuarios.csv");
+    res.send(csv);
+  } catch (error) {
+    res.status(500).json({ msg: error.message });
   }
 };

@@ -5,25 +5,33 @@ import {
   updateAdmin,
   deleteAdmin,
   loginAdmin,
+  listarUsuarios,
+  actualizarUsuario,
+  eliminarUsuario,
+  generarReporteVentas,
+  generarReporteUsuarios,
+  exportarReporteCSV,
 } from "../controllers/adminController.js";
-import { protegerRuta as verifyToken } from "../middlewares/authMiddleware.js";
 
+import { protegerRuta, soloAdmin } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// Obtener todos los administradores
-router.get("/", verifyToken, getAdmins);
-
-// Crear nuevo administrador
-router.post("/", createAdmin);
-
-// Actualizar un administrador por ID
-router.put("/:id", verifyToken, updateAdmin);
-
-// Eliminar un administrador por ID
-router.delete("/:id", verifyToken, deleteAdmin);
-
-// Login administrador (retorna token JWT)
+// ADMINISTRADORES
+router.get("/", protegerRuta, soloAdmin, getAdmins);
+router.post("/", protegerRuta, soloAdmin, createAdmin);
+router.put("/:id", protegerRuta, soloAdmin, updateAdmin);
+router.delete("/:id", protegerRuta, soloAdmin, deleteAdmin);
 router.post("/login", loginAdmin);
+
+// GESTIÓN DE USUARIOS
+router.get("/usuarios", protegerRuta, soloAdmin, listarUsuarios);
+router.put("/usuarios/:id", protegerRuta, soloAdmin, actualizarUsuario);
+router.delete("/usuarios/:id", protegerRuta, soloAdmin, eliminarUsuario);
+
+// REPORTES
+router.get("/reportes/ventas", protegerRuta, soloAdmin, generarReporteVentas);
+router.get("/reportes/usuarios", protegerRuta, soloAdmin, generarReporteUsuarios);
+router.get("/reportes/exportar/csv", protegerRuta, soloAdmin, exportarReporteCSV);
 
 export default router;
