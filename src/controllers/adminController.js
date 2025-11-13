@@ -84,6 +84,21 @@ export const eliminarUsuario = async (req, res) => {
   res.json({ msg: "Usuario eliminado correctamente" });
 };
 
+export const crearEmpleado = async (req, res) => {
+  try {
+    const nuevoEmpleado = new Usuario({
+      nombre: req.body.nombre,
+      correo: req.body.correo,
+      password: req.body.password,
+      rol: "empleado",
+    });
+    await nuevoEmpleado.save();
+    res.status(201).json(nuevoEmpleado);
+  } catch (error) {
+    res.status(400).json({ msg: "Error al crear empleado", error });
+  }
+};
+
 // --------------------------
 // REPORTES
 // --------------------------

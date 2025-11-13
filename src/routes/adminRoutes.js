@@ -11,6 +11,7 @@ import {
   generarReporteVentas,
   generarReporteUsuarios,
   exportarReporteCSV,
+  crearEmpleado
 } from "../controllers/adminController.js";
 
 import { protegerRuta, soloAdmin } from "../middlewares/authMiddleware.js";
@@ -20,9 +21,12 @@ const router = express.Router();
 // ADMINISTRADORES
 router.get("/", protegerRuta, soloAdmin, getAdmins);
 router.post("/", protegerRuta, soloAdmin, createAdmin);
+router.post("/empleados", protegerRuta, soloAdmin, crearEmpleado);
 router.put("/:id", protegerRuta, soloAdmin, updateAdmin);
 router.delete("/:id", protegerRuta, soloAdmin, deleteAdmin);
 router.post("/login", loginAdmin);
+
+
 
 // GESTIÓN DE USUARIOS
 router.get("/usuarios", protegerRuta, soloAdmin, listarUsuarios);
